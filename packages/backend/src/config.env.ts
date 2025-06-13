@@ -13,6 +13,7 @@ const envSchema = z.object({
   X_API_KEY: z.string(),
   OPENAI_API_KEY: z.string(),
   ELEVENLABS_API_KEY: z.string(),
+  LOG_LEVEL: z.string().default("info"),
 });
 
 // Parse and validate environment variables

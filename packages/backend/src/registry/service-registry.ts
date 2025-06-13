@@ -1,16 +1,16 @@
 type ServiceFactory<T = any> = () => T;
 type ServiceInstance<T = any> = T;
-import { createAudioService } from "../services/AudioService";
-import { createElevenLabsService } from "../services/ElevenLabsService";
-import { createLLMService } from "../services/LLMService/llm.service";
+import type { AudioService } from "../services/AudioService";
+import type { ElevenLabsService } from "../services/ElevenLabsService";
+import type { LLMService } from "../services/LLMService/llm.service";
 
 // Service type registry - maps service names to their types
 interface ServiceTypeRegistry {
-  audio: typeof createAudioService;
-  elevenlabs: typeof createElevenLabsService;
+  audio: AudioService;
+  elevenlabs: ElevenLabsService;
 
   // AI services
-  llm: typeof createLLMService;
+  llm: LLMService;
 }
 
 const createServiceRegistry = () => {

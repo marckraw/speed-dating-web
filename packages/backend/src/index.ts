@@ -67,7 +67,7 @@ app.get(
       `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     return {
-      onOpen(event, ws) {
+      onOpen(_event, ws) {
         console.log(`WebSocket connection opened for user: ${userId}`);
         if (ws.raw) {
           speedDatingSignaling.addConnection(userId, ws.raw);

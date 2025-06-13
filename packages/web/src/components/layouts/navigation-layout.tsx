@@ -36,49 +36,41 @@ export function NavigationLayout({ children }: NavigationLayoutProps) {
 
   return (
     <QueryProvider>
-      <div className="min-h-screen">
+      <div className="min-h-screen flex">
+        {/* Mobile overlay */}
+        {isMobileNavOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-30 md:hidden"
+            onClick={() => setIsMobileNavOpen(false)}
+          />
+        )}
         <MainNav
           className={`${
             isMobileNavOpen ? "translate-x-0" : "-translate-x-full"
-          } md:translate-x-0 fixed top-0 left-0 h-screen z-40`}
+          } md:translate-x-0 fixed md:relative top-0 left-0 h-screen z-40 flex-shrink-0`}
           onLogout={handleLogout}
           isExpanded={isSidebarExpanded}
           onExpandedChange={setIsSidebarExpanded}
         />
-        <div
-          className={`transition-[margin] duration-300 min-h-screen ${
-            isSidebarExpanded ? "md:ml-64" : "md:ml-16"
-          }`}
-        >
+        <div className="flex-1 flex flex-col min-h-screen min-w-0">
           <Header onToggleNav={() => setIsMobileNavOpen(!isMobileNavOpen)} />
           {pathname === "/figma-analyzer" || pathname === "/chat" ? (
             <main
               className={cn(
-                "w-full",
+                "flex-1 min-w-0",
                 pathname === "/chat" && [
                   "overflow-hidden",
                   "h-[calc(100vh-57px)]", // Full height minus header
-                  "w-full", // Full width on mobile
-                  // No margin on mobile, proper margin on desktop
-                  "ml-0 md:ml-0",
-                ]
+                ],
+                pathname === "/figma-analyzer" && "p-8"
               )}
-              style={
-                pathname === "/figma-analyzer"
-                  ? {
-                      padding: "2rem",
-                      width: isSidebarExpanded
-                        ? "calc(100vw - 17rem)"
-                        : "calc(100vw - 5rem)",
-                      maxWidth: "100vw",
-                    }
-                  : undefined
-              }
             >
               {children}
             </main>
           ) : (
-            <main className="container mx-auto p-4 md:p-8">{children}</main>
+            <main className="flex-1 min-w-0">
+              <div className="container mx-auto p-4 md:p-8">{children}</div>
+            </main>
           )}
         </div>
       </div>

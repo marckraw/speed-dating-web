@@ -105,14 +105,40 @@ export function useSpeedDating() {
       };
 
       pc.onconnectionstatechange = () => {
-        console.log("Peer connection state:", pc.connectionState);
+        console.log("🔄 Peer connection state changed to:", pc.connectionState);
         if (pc.connectionState === "connected") {
+          console.log("🎉 Peer connection established successfully!");
           setConnectionState("calling");
-        } else if (
-          pc.connectionState === "disconnected" ||
-          pc.connectionState === "failed"
-        ) {
-          endCall();
+        } else if (pc.connectionState === "disconnected") {
+          console.log("⚠️ Peer connection disconnected");
+          // Don't immediately end call on disconnection - give it time to reconnect
+          setTimeout(() => {
+            if (
+              pc.connectionState === "disconnected" ||
+              pc.connectionState === "failed"
+            ) {
+              console.log("🔚 Peer connection failed permanently, ending call");
+              endCall();
+            }
+          }, 5000); // Wait 5 seconds before giving up
+        } else if (pc.connectionState === "failed") {
+          console.log("❌ Peer connection failed!");
+          // Don't immediately end call - log more info first
+          console.log("🔍 ICE connection state:", pc.iceConnectionState);
+          console.log("🔍 ICE gathering state:", pc.iceGatheringState);
+          console.log("🔍 Signaling state:", pc.signalingState);
+
+          // Give it a moment before ending call
+          setTimeout(() => {
+            if (pc.connectionState === "failed") {
+              console.log(
+                "🔚 Peer connection still failed after delay, ending call"
+              );
+              endCall();
+            }
+          }, 3000); // Wait 3 seconds before giving up
+        } else {
+          console.log(`ℹ️ Peer connection state: ${pc.connectionState}`);
         }
       };
 

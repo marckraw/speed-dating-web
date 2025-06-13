@@ -137,7 +137,9 @@ class SpeedDatingSignaling {
       return;
     }
 
-    console.log(`Matched users: ${user1Id} and ${user2Id}`);
+    console.log(
+      `🎯 Matched users: ${user1Id} (initiator) and ${user2Id} (receiver)`
+    );
 
     // Update connection states
     user1.isInQueue = false;
@@ -147,17 +149,25 @@ class SpeedDatingSignaling {
 
     // Notify both users of the match
     // User1 will be the initiator (sends offer first)
-    this.sendMessage(user1Id, {
+    console.log(`📢 Notifying ${user1Id} they are the initiator`);
+    const user1Success = this.sendMessage(user1Id, {
       type: "match-found",
       partnerId: user2Id,
       isInitiator: true,
     });
 
-    this.sendMessage(user2Id, {
+    console.log(`📢 Notifying ${user2Id} they are the receiver`);
+    const user2Success = this.sendMessage(user2Id, {
       type: "match-found",
       partnerId: user1Id,
       isInitiator: false,
     });
+
+    if (!user1Success || !user2Success) {
+      console.error(
+        `❌ Failed to notify one or both users of match. User1: ${user1Success}, User2: ${user2Success}`
+      );
+    }
   }
 
   handleSignalingMessage(userId: string, message: SignalingMessage) {
@@ -173,13 +183,29 @@ class SpeedDatingSignaling {
         this.leaveQueue(userId);
         break;
 
-      case "offer":
-        this.forwardSignalingMessage(message.to, {
+      case "offer": {
+        console.log(`📤 Forwarding offer from ${userId} to ${message.to}`);
+
+        // Try to send offer, with retry if user is temporarily disconnected
+        const success = this.forwardSignalingMessage(message.to, {
           type: "offer",
           offer: message.offer,
           from: userId,
         });
+
+        if (!success) {
+          console.log(`⏳ Offer failed to send, retrying in 2 seconds...`);
+          setTimeout(() => {
+            console.log(`🔄 Retrying offer send to ${message.to}`);
+            this.forwardSignalingMessage(message.to, {
+              type: "offer",
+              offer: message.offer,
+              from: userId,
+            });
+          }, 2000);
+        }
         break;
+      }
 
       case "answer":
         this.forwardSignalingMessage(message.to, {
@@ -206,8 +232,18 @@ class SpeedDatingSignaling {
     }
   }
 
-  private forwardSignalingMessage(toUserId: string, message: ServerMessage) {
-    this.sendMessage(toUserId, message);
+  private forwardSignalingMessage(
+    toUserId: string,
+    message: ServerMessage
+  ): boolean {
+    console.log(`🔀 Forwarding ${message.type} message to user: ${toUserId}`);
+    const success = this.sendMessage(toUserId, message);
+    if (!success) {
+      console.error(
+        `❌ Failed to forward ${message.type} to ${toUserId} - user not found or connection closed`
+      );
+    }
+    return success;
   }
 
   private handleCallEnded(userId: string) {
@@ -234,14 +270,32 @@ class SpeedDatingSignaling {
     }
   }
 
-  private sendMessage(userId: string, message: ServerMessage) {
+  private sendMessage(userId: string, message: ServerMessage): boolean {
     const connection = this.connections.get(userId);
-    if (connection) {
-      try {
-        connection.ws.send(JSON.stringify(message));
-      } catch (error) {
-        console.error(`Failed to send message to ${userId}:`, error);
-      }
+    if (!connection) {
+      console.error(`❌ User ${userId} not found in connections`);
+      return false;
+    }
+
+    // Check WebSocket state before sending
+    if (connection.ws.readyState !== 1) {
+      // 1 = OPEN
+      console.error(
+        `❌ WebSocket for ${userId} is not open (state: ${connection.ws.readyState})`
+      );
+      return false;
+    }
+
+    try {
+      console.log(
+        `📨 Sending ${message.type} to ${userId} (WebSocket state: ${connection.ws.readyState})`
+      );
+      connection.ws.send(JSON.stringify(message));
+      console.log(`✅ Successfully sent ${message.type} to ${userId}`);
+      return true;
+    } catch (error) {
+      console.error(`❌ Failed to send ${message.type} to ${userId}:`, error);
+      return false;
     }
   }
 

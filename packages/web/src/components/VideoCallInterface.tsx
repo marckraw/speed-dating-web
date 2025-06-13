@@ -17,6 +17,10 @@ export default function VideoCallInterface() {
     leaveQueue,
     endCall,
     startLocalVideo,
+    videoDevices,
+    selectedVideoDeviceId,
+    setSelectedVideoDeviceId,
+    getMediaDevices,
   } = useSpeedDating();
 
   // Set up video refs
@@ -31,6 +35,11 @@ export default function VideoCallInterface() {
       remoteVideoRef.current = remoteVideoElement.current;
     }
   }, [localVideoRef, remoteVideoRef]);
+
+  // Get media devices on mount
+  useEffect(() => {
+    getMediaDevices();
+  }, [getMediaDevices]);
 
   // Auto-connect on mount
   useEffect(() => {
@@ -161,14 +170,38 @@ export default function VideoCallInterface() {
       </div>
 
       {/* Control Buttons */}
-      <div className="flex justify-center gap-4">
+      <div className="flex flex-col items-center justify-center gap-4">
         {connectionState === "connected" && (
-          <button
-            onClick={handleJoinQueue}
-            className="bg-gradient-to-r from-pink-500 to-red-500 text-white px-8 py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity"
-          >
-            Start Dating 💕
-          </button>
+          <div className="w-full max-w-sm space-y-4">
+            {videoDevices.length > 1 && (
+              <div>
+                <label
+                  htmlFor="camera-select"
+                  className="block text-sm font-medium text-muted-foreground mb-1"
+                >
+                  Select Camera
+                </label>
+                <select
+                  id="camera-select"
+                  value={selectedVideoDeviceId || ""}
+                  onChange={(e) => setSelectedVideoDeviceId(e.target.value)}
+                  className="block w-full p-2 border-border rounded-md bg-background text-foreground"
+                >
+                  {videoDevices.map((device, index) => (
+                    <option key={device.deviceId} value={device.deviceId}>
+                      {device.label || `Camera ${index + 1}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <button
+              onClick={handleJoinQueue}
+              className="w-full bg-gradient-to-r from-pink-500 to-red-500 text-white px-8 py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity"
+            >
+              Start Dating 💕
+            </button>
+          </div>
         )}
 
         {connectionState === "in-queue" && (

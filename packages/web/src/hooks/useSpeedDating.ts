@@ -53,12 +53,26 @@ export function useSpeedDating() {
   const [partnerId, setPartnerId] = useState<string | null>(null);
   const [isInitiator, setIsInitiator] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedVideoDeviceId, setSelectedVideoDeviceId] = useState<
+    string | undefined
+  >();
 
   // Create a ref to hold the latest state to avoid stale closures in event handlers
-  const stateRef = useRef({ connectionState, partnerId, isInitiator });
+  const stateRef = useRef({
+    connectionState,
+    partnerId,
+    isInitiator,
+    selectedVideoDeviceId,
+  });
   useEffect(() => {
-    stateRef.current = { connectionState, partnerId, isInitiator };
-  }, [connectionState, partnerId, isInitiator]);
+    stateRef.current = {
+      connectionState,
+      partnerId,
+      isInitiator,
+      selectedVideoDeviceId,
+    };
+  }, [connectionState, partnerId, isInitiator, selectedVideoDeviceId]);
 
   // WebSocket and WebRTC refs
   const wsRef = useRef<WebSocket | null>(null);
@@ -182,6 +196,20 @@ export function useSpeedDating() {
         }
       };
 
+      pc.oniceconnectionstatechange = () => {
+        console.log(
+          "🧊 ICE connection state changed to:",
+          pc.iceConnectionState
+        );
+        if (pc.iceConnectionState === "failed") {
+          console.error(
+            "❌ ICE connection failed. This may be a firewall or network issue."
+          );
+          // You might want to try restarting ICE here
+          // pc.restartIce();
+        }
+      };
+
       return pc;
     },
     [sendMessage, userId]
@@ -189,10 +217,18 @@ export function useSpeedDating() {
 
   const startLocalVideo = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+      console.log(
+        `📹 Trying to get local stream with deviceId: ${
+          selectedVideoDeviceId || "default"
+        }`
+      );
+      const constraints: MediaStreamConstraints = {
         audio: true,
-      });
+        video: selectedVideoDeviceId
+          ? { deviceId: { exact: selectedVideoDeviceId } }
+          : true,
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
       localStreamRef.current = stream;
       if (localVideoRef.current) {
@@ -205,7 +241,24 @@ export function useSpeedDating() {
       setError("Failed to access camera/microphone");
       throw err;
     }
-  }, []);
+  }, [selectedVideoDeviceId]);
+
+  const getMediaDevices = useCallback(async () => {
+    try {
+      // Note: Full device labels are only available after granting camera permission.
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cameras = devices.filter((device) => device.kind === "videoinput");
+      console.log("📷 Found cameras:", cameras);
+      setVideoDevices(cameras);
+      // If there's no camera selected yet, and we found some, select the first one.
+      if (cameras.length > 0 && !selectedVideoDeviceId) {
+        setSelectedVideoDeviceId(cameras[0].deviceId);
+      }
+    } catch (err) {
+      console.error("❌ Error enumerating media devices:", err);
+      setError("Could not list cameras.");
+    }
+  }, [selectedVideoDeviceId]);
 
   const createOfferWithPartner = useCallback(
     async (targetPartnerId: string) => {
@@ -323,12 +376,18 @@ export function useSpeedDating() {
 
   const handleAnswer = useCallback(
     async (answer: RTCSessionDescriptionInit) => {
-      if (!peerConnectionRef.current) return;
-
+      if (!peerConnectionRef.current) {
+        console.error("❌ Cannot handle answer, no peer connection");
+        return;
+      }
       try {
+        console.log("✅ Received answer, setting remote description...");
         await peerConnectionRef.current.setRemoteDescription(answer);
+        console.log(
+          "🎉 Remote description (answer) set successfully! Connection should establish now."
+        );
       } catch (err) {
-        console.error("Failed to handle answer:", err);
+        console.error("❌ Failed to set remote description from answer:", err);
         setError("Failed to process call answer");
       }
     },
@@ -665,5 +724,11 @@ export function useSpeedDating() {
 
     // Utils
     startLocalVideo,
+    getMediaDevices,
+
+    // Devices
+    videoDevices,
+    selectedVideoDeviceId,
+    setSelectedVideoDeviceId,
   };
 }

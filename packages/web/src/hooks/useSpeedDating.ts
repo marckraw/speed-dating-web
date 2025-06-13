@@ -222,8 +222,13 @@ export function useSpeedDating() {
     setConnectionState("connecting");
     setError(null);
 
+    // Use secure WebSocket (wss://) for HTTPS pages, insecure (ws://) for HTTP pages
+    const protocol =
+      typeof window !== "undefined" && window.location.protocol === "https:"
+        ? "wss:"
+        : "ws:";
     const ws = new WebSocket(
-      `ws://${process.env.NEXT_PUBLIC_BASE_URL}/ws?userId=${userId}`
+      `${protocol}//${process.env.NEXT_PUBLIC_BASE_URL}/ws?userId=${userId}`
     );
 
     ws.onopen = () => {

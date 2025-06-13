@@ -57,6 +57,7 @@ export function useSpeedDating() {
   const [selectedVideoDeviceId, setSelectedVideoDeviceId] = useState<
     string | undefined
   >();
+  const [debugInfo, setDebugInfo] = useState<Record<string, any>>({});
 
   // Create a ref to hold the latest state to avoid stale closures in event handlers
   const stateRef = useRef({
@@ -201,6 +202,10 @@ export function useSpeedDating() {
           "🧊 ICE connection state changed to:",
           pc.iceConnectionState
         );
+        setDebugInfo((prev) => ({
+          ...prev,
+          iceConnectionState: pc.iceConnectionState,
+        }));
         if (pc.iceConnectionState === "failed") {
           console.error(
             "❌ ICE connection failed. This may be a firewall or network issue."
@@ -208,6 +213,13 @@ export function useSpeedDating() {
           // You might want to try restarting ICE here
           // pc.restartIce();
         }
+      };
+
+      pc.onsignalingstatechange = () => {
+        setDebugInfo((prev) => ({
+          ...prev,
+          signalingState: pc.signalingState,
+        }));
       };
 
       return pc;
@@ -730,5 +742,8 @@ export function useSpeedDating() {
     videoDevices,
     selectedVideoDeviceId,
     setSelectedVideoDeviceId,
+
+    // Debug
+    debugInfo,
   };
 }

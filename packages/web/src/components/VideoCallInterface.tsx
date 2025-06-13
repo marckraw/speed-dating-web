@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSpeedDating } from "@/hooks/useSpeedDating";
 
 export default function VideoCallInterface() {
@@ -21,7 +21,10 @@ export default function VideoCallInterface() {
     selectedVideoDeviceId,
     setSelectedVideoDeviceId,
     getMediaDevices,
+    debugInfo,
   } = useSpeedDating();
+
+  const [isDebugOpen, setIsDebugOpen] = useState(false);
 
   // Set up video refs
   const localVideoElement = useRef<HTMLVideoElement>(null);
@@ -245,6 +248,35 @@ export default function VideoCallInterface() {
           </p>
         </div>
       )}
+
+      {/* Debug Info Panel */}
+      <div className="bg-card p-4 rounded-lg border mt-6">
+        <button
+          onClick={() => setIsDebugOpen(!isDebugOpen)}
+          className="font-semibold w-full text-left"
+        >
+          {isDebugOpen ? "▼" : "►"} Debug Info
+        </button>
+        {isDebugOpen && (
+          <div className="mt-4 space-y-2 text-sm text-muted-foreground bg-background p-3 rounded">
+            <p>
+              <strong>Hook State:</strong> {connectionState}
+            </p>
+            <p>
+              <strong>Signaling State:</strong>{" "}
+              {debugInfo.signalingState || "N/A"}
+            </p>
+            <p>
+              <strong>Peer Connection State:</strong>{" "}
+              {debugInfo.connectionState || "N/A"}
+            </p>
+            <p>
+              <strong>ICE Connection State:</strong>{" "}
+              {debugInfo.iceConnectionState || "N/A"}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -78,42 +78,45 @@ export function useSpeedDating() {
     }
   }, []);
 
-  const createPeerConnection = useCallback(() => {
-    const pc = new RTCPeerConnection(pcConfig);
+  const createPeerConnection = useCallback(
+    (targetPartnerId: string) => {
+      const pc = new RTCPeerConnection(pcConfig);
 
-    pc.onicecandidate = (event) => {
-      if (event.candidate && partnerId) {
-        sendMessage({
-          type: "ice-candidate",
-          candidate: event.candidate,
-          to: partnerId,
-          from: userId,
-        });
-      }
-    };
+      pc.onicecandidate = (event) => {
+        if (event.candidate && targetPartnerId) {
+          sendMessage({
+            type: "ice-candidate",
+            candidate: event.candidate,
+            to: targetPartnerId,
+            from: userId,
+          });
+        }
+      };
 
-    pc.ontrack = (event) => {
-      console.log("Received remote stream");
-      remoteStreamRef.current = event.streams[0];
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
-      }
-    };
+      pc.ontrack = (event) => {
+        console.log("Received remote stream");
+        remoteStreamRef.current = event.streams[0];
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = event.streams[0];
+        }
+      };
 
-    pc.onconnectionstatechange = () => {
-      console.log("Peer connection state:", pc.connectionState);
-      if (pc.connectionState === "connected") {
-        setConnectionState("calling");
-      } else if (
-        pc.connectionState === "disconnected" ||
-        pc.connectionState === "failed"
-      ) {
-        endCall();
-      }
-    };
+      pc.onconnectionstatechange = () => {
+        console.log("Peer connection state:", pc.connectionState);
+        if (pc.connectionState === "connected") {
+          setConnectionState("calling");
+        } else if (
+          pc.connectionState === "disconnected" ||
+          pc.connectionState === "failed"
+        ) {
+          endCall();
+        }
+      };
 
-    return pc;
-  }, [partnerId, sendMessage, userId]);
+      return pc;
+    },
+    [sendMessage, userId]
+  );
 
   const startLocalVideo = useCallback(async () => {
     try {
@@ -257,7 +260,7 @@ export function useSpeedDating() {
 
             // Start local video and create peer connection
             await startLocalVideo();
-            peerConnectionRef.current = createPeerConnection();
+            peerConnectionRef.current = createPeerConnection(message.partnerId);
 
             // If initiator, create and send offer
             if (message.isInitiator) {
@@ -266,9 +269,12 @@ export function useSpeedDating() {
             break;
 
           case "offer":
-            if (peerConnectionRef.current) {
-              await createAnswer(message.offer);
+            if (!peerConnectionRef.current) {
+              // Create peer connection if we don't have one yet
+              await startLocalVideo();
+              peerConnectionRef.current = createPeerConnection(partnerId!);
             }
+            await createAnswer(message.offer);
             break;
 
           case "answer":
@@ -299,8 +305,16 @@ export function useSpeedDating() {
 
     ws.onerror = (error) => {
       console.error("WebSocket error:", error);
-      setError("Connection error");
+      setError("Connection error - please check your internet connection");
       setConnectionState("disconnected");
+
+      // Try to reconnect after a delay
+      setTimeout(() => {
+        if (wsRef.current?.readyState !== WebSocket.OPEN) {
+          console.log("Attempting to reconnect...");
+          connect();
+        }
+      }, 3000);
     };
 
     wsRef.current = ws;

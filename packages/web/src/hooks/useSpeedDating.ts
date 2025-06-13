@@ -213,10 +213,48 @@ export function useSpeedDating() {
         }));
         if (pc.iceConnectionState === "failed") {
           console.error(
-            "❌ ICE connection failed. This may be a firewall or network issue."
+            "❌ ICE connection failed. This could be a firewall, NAT, or network issue. Logging detailed stats..."
           );
-          // You might want to try restarting ICE here
-          // pc.restartIce();
+
+          // Log detailed stats for debugging, this is the most important part for diagnosing network issues.
+          pc.getStats().then((stats) => {
+            console.group("📊 WebRTC Stats Report on Failure");
+            const reports = Array.from(stats.values());
+
+            const candidates = reports.filter(
+              (r) =>
+                r.type === "local-candidate" || r.type === "remote-candidate"
+            );
+            const candidatePairs = reports.filter(
+              (r) => r.type === "candidate-pair"
+            );
+
+            console.group("Discovered Candidates");
+            candidates.forEach((c) => {
+              console.log(`  - ${c.type} (${c.id}):`, {
+                address: c.address,
+                port: c.port,
+                protocol: c.protocol,
+                candidateType: c.candidateType, // host, srflx, prflx, relay
+              });
+            });
+            console.groupEnd();
+
+            console.group("Attempted Candidate Pairs");
+            candidatePairs.forEach((p) => {
+              console.log(`  - Pair (${p.id}):`, {
+                state: p.state, // succeeded, failed, frozen, waiting, in-progress
+                nominated: p.nominated,
+                localCandidateId: p.localCandidateId,
+                remoteCandidateId: p.remoteCandidateId,
+                requestsSent: p.requestsSent,
+                responsesReceived: p.responsesReceived,
+                totalRoundTripTime: p.totalRoundTripTime,
+              });
+            });
+            console.groupEnd();
+            console.groupEnd();
+          });
         }
       };
 

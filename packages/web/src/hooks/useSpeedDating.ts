@@ -161,6 +161,10 @@ export function useSpeedDating() {
 
       pc.onconnectionstatechange = () => {
         console.log("🔄 Peer connection state changed to:", pc.connectionState);
+        setDebugInfo((prev) => ({
+          ...prev,
+          connectionState: pc.connectionState,
+        }));
         if (pc.connectionState === "connected") {
           console.log("🎉 Peer connection established successfully!");
           setConnectionState("calling");
@@ -221,6 +225,14 @@ export function useSpeedDating() {
           signalingState: pc.signalingState,
         }));
       };
+
+      // Initialize debug info with current states
+      setDebugInfo((prev) => ({
+        ...prev,
+        signalingState: pc.signalingState,
+        connectionState: pc.connectionState,
+        iceConnectionState: pc.iceConnectionState,
+      }));
 
       return pc;
     },
@@ -564,7 +576,7 @@ export function useSpeedDating() {
               console.log("🔧 No peer connection yet, creating one...");
               // Create peer connection if we don't have one yet
               await startLocalVideo();
-              peerConnectionRef.current = createPeerConnection(partnerId!);
+              peerConnectionRef.current = createPeerConnection(message.from);
             }
             console.log("📞 Creating answer...");
             await createAnswer(message.offer);

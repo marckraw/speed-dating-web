@@ -11,6 +11,8 @@ const envSchema = z.object({
     .default("development"),
   PORT: z.string().default("3000"),
   X_API_KEY: z.string(),
+  OPENAI_API_KEY: z.string(),
+  ELEVENLABS_API_KEY: z.string(),
 });
 
 // Parse and validate environment variables

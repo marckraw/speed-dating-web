@@ -207,10 +207,6 @@ export function useSpeedDating() {
           "🧊 ICE connection state changed to:",
           pc.iceConnectionState
         );
-        setDebugInfo((prev) => ({
-          ...prev,
-          iceConnectionState: pc.iceConnectionState,
-        }));
         if (pc.iceConnectionState === "failed") {
           console.error(
             "❌ ICE connection failed. This could be a firewall, NAT, or network issue. Logging detailed stats..."
@@ -255,6 +251,10 @@ export function useSpeedDating() {
             console.groupEnd();
             console.groupEnd();
           });
+          setDebugInfo((prev) => ({
+            ...prev,
+            iceConnectionState: pc.iceConnectionState,
+          }));
         }
       };
 

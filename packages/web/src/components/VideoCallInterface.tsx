@@ -11,6 +11,7 @@ export default function VideoCallInterface() {
     error,
     localVideoRef,
     remoteVideoRef,
+    remoteStream,
     connect,
     disconnect,
     joinQueue,
@@ -38,6 +39,13 @@ export default function VideoCallInterface() {
       remoteVideoRef.current = remoteVideoElement.current;
     }
   }, [localVideoRef, remoteVideoRef]);
+
+  // This new effect robustly handles displaying the remote stream.
+  useEffect(() => {
+    if (remoteVideoElement.current && remoteStream) {
+      remoteVideoElement.current.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
 
   // Get media devices on mount
   useEffect(() => {

@@ -58,6 +58,7 @@ export function useSpeedDating() {
     string | undefined
   >();
   const [debugInfo, setDebugInfo] = useState<Record<string, any>>({});
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
   // Create a ref to hold the latest state to avoid stale closures in event handlers
   const stateRef = useRef({
@@ -79,7 +80,6 @@ export function useSpeedDating() {
   const wsRef = useRef<WebSocket | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  const remoteStreamRef = useRef<MediaStream | null>(null);
 
   // Video element refs
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -152,12 +152,8 @@ export function useSpeedDating() {
       };
 
       pc.ontrack = (event) => {
-        console.log("[pc.ontrack] event", event);
         console.log("Received remote stream");
-        remoteStreamRef.current = event.streams[0];
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
-        }
+        setRemoteStream(event.streams[0]);
       };
 
       pc.onconnectionstatechange = () => {
@@ -202,58 +198,59 @@ export function useSpeedDating() {
         }
       };
 
-      pc.oniceconnectionstatechange = async () => {
+      pc.oniceconnectionstatechange = () => {
         console.log(
           "🧊 ICE connection state changed to:",
           pc.iceConnectionState
         );
+        setDebugInfo((prev) => ({
+          ...prev,
+          iceConnectionState: pc.iceConnectionState,
+        }));
         if (pc.iceConnectionState === "failed") {
           console.error(
             "❌ ICE connection failed. This could be a firewall, NAT, or network issue. Logging detailed stats..."
           );
 
           // Log detailed stats for debugging, this is the most important part for diagnosing network issues.
-          const stats = await pc.getStats();
-          console.group("📊 WebRTC Stats Report on Failure");
-          const reports = Array.from(stats.values());
+          pc.getStats().then((stats) => {
+            console.group("📊 WebRTC Stats Report on Failure");
+            const reports = Array.from(stats.values());
 
-          const candidates = reports.filter(
-            (r) => r.type === "local-candidate" || r.type === "remote-candidate"
-          );
-          const candidatePairs = reports.filter(
-            (r) => r.type === "candidate-pair"
-          );
+            const candidates = reports.filter(
+              (r) =>
+                r.type === "local-candidate" || r.type === "remote-candidate"
+            );
+            const candidatePairs = reports.filter(
+              (r) => r.type === "candidate-pair"
+            );
 
-          console.group("Discovered Candidates");
-          candidates.forEach((c) => {
-            console.log(`  - ${c.type} (${c.id}):`, {
-              address: c.address,
-              port: c.port,
-              protocol: c.protocol,
-              candidateType: c.candidateType, // host, srflx, prflx, relay
+            console.group("Discovered Candidates");
+            candidates.forEach((c) => {
+              console.log(`  - ${c.type} (${c.id}):`, {
+                address: c.address,
+                port: c.port,
+                protocol: c.protocol,
+                candidateType: c.candidateType, // host, srflx, prflx, relay
+              });
             });
-          });
-          console.groupEnd();
+            console.groupEnd();
 
-          console.group("Attempted Candidate Pairs");
-          candidatePairs.forEach((p) => {
-            console.log(`  - Pair (${p.id}):`, {
-              state: p.state, // succeeded, failed, frozen, waiting, in-progress
-              nominated: p.nominated,
-              localCandidateId: p.localCandidateId,
-              remoteCandidateId: p.remoteCandidateId,
-              requestsSent: p.requestsSent,
-              responsesReceived: p.responsesReceived,
-              totalRoundTripTime: p.totalRoundTripTime,
+            console.group("Attempted Candidate Pairs");
+            candidatePairs.forEach((p) => {
+              console.log(`  - Pair (${p.id}):`, {
+                state: p.state, // succeeded, failed, frozen, waiting, in-progress
+                nominated: p.nominated,
+                localCandidateId: p.localCandidateId,
+                remoteCandidateId: p.remoteCandidateId,
+                requestsSent: p.requestsSent,
+                responsesReceived: p.responsesReceived,
+                totalRoundTripTime: p.totalRoundTripTime,
+              });
             });
+            console.groupEnd();
+            console.groupEnd();
           });
-          console.groupEnd();
-          console.groupEnd();
-
-          setDebugInfo((prev) => ({
-            ...prev,
-            iceConnectionState: pc.iceConnectionState,
-          }));
         }
       };
 
@@ -743,7 +740,7 @@ export function useSpeedDating() {
     }
 
     // Clear remote stream
-    remoteStreamRef.current = null;
+    setRemoteStream(null);
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = null;
     }
@@ -782,6 +779,7 @@ export function useSpeedDating() {
     partnerId,
     isInitiator,
     error,
+    remoteStream,
 
     // Video refs
     localVideoRef,

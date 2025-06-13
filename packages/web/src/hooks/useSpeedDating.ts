@@ -54,6 +54,12 @@ export function useSpeedDating() {
   const [isInitiator, setIsInitiator] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Create a ref to hold the latest state to avoid stale closures in event handlers
+  const stateRef = useRef({ connectionState, partnerId, isInitiator });
+  useEffect(() => {
+    stateRef.current = { connectionState, partnerId, isInitiator };
+  }, [connectionState, partnerId, isInitiator]);
+
   // WebSocket and WebRTC refs
   const wsRef = useRef<WebSocket | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -400,9 +406,7 @@ export function useSpeedDating() {
         const message: ServerMessage = JSON.parse(event.data);
         console.log("📨 Received message:", message.type, message);
         console.log("🔍 Current state when message received:", {
-          connectionState,
-          partnerId,
-          isInitiator,
+          ...stateRef.current,
           hasPeerConnection: !!peerConnectionRef.current,
           hasLocalStream: !!localStreamRef.current,
           wsReadyState: wsRef.current?.readyState,
@@ -523,23 +527,26 @@ export function useSpeedDating() {
     };
 
     ws.onclose = (event) => {
-      console.log("🔌 WebSocket disconnected", {
-        code: event.code,
-        reason: event.reason,
-        wasClean: event.wasClean,
-      });
-      setConnectionState("disconnected");
+      console.warn(
+        "🔌 Signaling channel (WebSocket) disconnected. The connection may recover.",
+        {
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean,
+        }
+      );
     };
 
     ws.onerror = (error) => {
       console.error("❌ WebSocket error:", error);
-      setError("Connection error - please check your internet connection");
-      setConnectionState("disconnected");
+      // Set a non-fatal error message. The pc.onconnectionstatechange handler
+      // will determine if the call has truly failed.
+      setError("A network error occurred. Trying to recover...");
 
-      // Try to reconnect after a delay
+      // Reconnect logic can stay to re-establish the signaling channel
       setTimeout(() => {
         if (wsRef.current?.readyState !== WebSocket.OPEN) {
-          console.log("🔄 Attempting to reconnect...");
+          console.log("🔄 Attempting to reconnect signaling channel...");
           connect();
         }
       }, 3000);
@@ -553,8 +560,7 @@ export function useSpeedDating() {
         console.log("💓 WebSocket health check:", {
           readyState: wsRef.current.readyState,
           url: wsRef.current.url,
-          connectionState,
-          partnerId,
+          ...stateRef.current,
           hasLocalStream: !!localStreamRef.current,
           hasPeerConnection: !!peerConnectionRef.current,
         });
@@ -565,12 +571,14 @@ export function useSpeedDating() {
     const originalOnClose = ws.onclose;
     ws.onclose = (event) => {
       clearInterval(healthCheck);
-      console.log("🔌 WebSocket disconnected", {
-        code: event.code,
-        reason: event.reason,
-        wasClean: event.wasClean,
-      });
-      setConnectionState("disconnected");
+      console.warn(
+        "🔌 Signaling channel (WebSocket) disconnected. The connection may recover.",
+        {
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean,
+        }
+      );
     };
   }, [
     userId,

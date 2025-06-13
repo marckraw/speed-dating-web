@@ -1,75 +1,16 @@
 type ServiceFactory<T = any> = () => T;
 type ServiceInstance<T = any> = T;
-
-// Import clean types from services
-import type { NotificationService } from "../domains/communication/services/notification.service";
-import type { SlackService } from "../domains/communication/services/slack.service";
-import type { AudioService } from "../domains/communication/services/AudioService";
-import type { ElevenLabsService } from "../domains/communication/services/ElevenLabsService";
-import type { LLMService } from "../domains/ai/services/LLMService/llm.service";
-import type { ConversationService } from "../domains/ai/services/ConversationService/conversation.service";
-import type { MemoryService } from "../domains/ai/services/MemoryService/memory.service";
-import type { DecisionMakerService } from "../domains/ai/services/DecisionMakerService/decision-maker.service";
-import type { PipelineService } from "../domains/workflow/services/pipeline.service";
-import type { ApprovalService } from "../domains/workflow/services/approval.service";
-import type { SignalService } from "../domains/workflow/services/signal.service";
-import type { StoryblokService } from "../domains/integration/services/StoryblokService/storyblok.service";
-import type { GitHubService } from "../domains/integration/services/GithubService/github.service";
-import type { ChangelogService } from "../domains/integration/services/ChangelogService/changelog.service";
-
-// Core services - using typeof for services that don't export types
-import { databaseService } from "../services/atoms/DatabaseService/database.service";
-import { sessionService } from "../services/atoms/SessionService/session.service";
-import { streamManager } from "../services/atoms/StreamManagerService/stream.manager.service";
-import { qdrantService } from "../services/atoms/QdrantService/qdrant.service";
-import { awsService } from "../domains/integration/services/AWS/aws.service";
-import { imageService } from "../services/atoms/ImageService/image.service";
-import { fileTransferService } from "../services/atoms/FileTransferService/file-transfer.service";
-
-// Agent services
-import { agentService } from "../agent/services/AgentService/agent.service";
-import { agentFlowService } from "../agent/services/AgentFlowService/agent-flow.service";
-import { evaluationService } from "../services/EvaluationService/evaluation.service";
-import { toolRunnerService } from "../services/atoms/ToolRunnerService/toolRunner.service";
+import { createAudioService } from "../services/AudioService";
+import { createElevenLabsService } from "../services/ElevenLabsService";
+import { createLLMService } from "../services/LLMService/llm.service";
 
 // Service type registry - maps service names to their types
 interface ServiceTypeRegistry {
-  // Communication services
-  notification: NotificationService;
-  slack: SlackService;
-  audio: AudioService;
-  elevenlabs: ElevenLabsService;
+  audio: typeof createAudioService;
+  elevenlabs: typeof createElevenLabsService;
 
   // AI services
-  llm: LLMService;
-  conversation: ConversationService;
-  memory: MemoryService;
-  decisionMaker: DecisionMakerService;
-
-  // Workflow services
-  pipeline: PipelineService;
-  approval: ApprovalService;
-  signal: SignalService;
-
-  // Integration services
-  storyblok: StoryblokService;
-  github: GitHubService;
-  changelog: ChangelogService;
-
-  // Core services
-  database: typeof databaseService;
-  session: typeof sessionService;
-  stream: typeof streamManager;
-  qdrant: typeof qdrantService;
-  aws: typeof awsService;
-  image: typeof imageService;
-  fileTransfer: typeof fileTransferService;
-
-  // Agent services
-  agent: typeof agentService;
-  agentFlow: typeof agentFlowService;
-  evaluation: typeof evaluationService;
-  toolRunner: typeof toolRunnerService;
+  llm: typeof createLLMService;
 }
 
 const createServiceRegistry = () => {

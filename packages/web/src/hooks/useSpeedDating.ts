@@ -223,7 +223,7 @@ export function useSpeedDating() {
     setError(null);
 
     const ws = new WebSocket(
-      `ws://${process.env.NEXT_PUBLIC_BASE_URL}:3333/ws?userId=${userId}`
+      `ws://${process.env.NEXT_PUBLIC_BASE_URL}/ws?userId=${userId}`
     );
 
     ws.onopen = () => {

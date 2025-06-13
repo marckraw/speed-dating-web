@@ -35,8 +35,9 @@ export default function VideoCallInterface() {
   // Auto-connect on mount
   useEffect(() => {
     connect();
+    // Disconnect when the component is unmounted
     return () => disconnect();
-  }, [connect, disconnect]);
+  }, []); // <-- Empty dependency array
 
   const getStatusText = () => {
     switch (connectionState) {

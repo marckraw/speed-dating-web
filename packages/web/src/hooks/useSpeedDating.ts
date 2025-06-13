@@ -67,19 +67,44 @@ export function useSpeedDating() {
   // Queue for ICE candidates received before remote description is set
   const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
 
-  // WebRTC configuration
+  // WebRTC configuration with TURN fallback for same-network connections
   const pcConfig = {
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
       { urls: "stun:stun1.l.google.com:19302" },
+      // Free TURN servers for testing (consider getting your own for production)
+      {
+        urls: "turn:openrelay.metered.ca:80",
+        username: "openrelayproject",
+        credential: "openrelayproject",
+      },
+      {
+        urls: "turn:openrelay.metered.ca:443",
+        username: "openrelayproject",
+        credential: "openrelayproject",
+      },
     ],
   };
 
-  const sendMessage = useCallback((message: SignalingMessage) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(message));
-    }
-  }, []);
+  const sendMessage = useCallback(
+    (message: SignalingMessage) => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        console.log("📤 Sending message:", message.type, {
+          to: "to" in message ? message.to : "N/A",
+          from: "from" in message ? message.from : userId,
+          timestamp: new Date().toISOString(),
+        });
+        wsRef.current.send(JSON.stringify(message));
+      } else {
+        console.error("❌ Cannot send message - WebSocket not open:", {
+          messageType: message.type,
+          wsState: wsRef.current?.readyState,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    },
+    [userId]
+  );
 
   const createPeerConnection = useCallback(
     (targetPartnerId: string) => {
@@ -87,12 +112,21 @@ export function useSpeedDating() {
 
       pc.onicecandidate = (event) => {
         if (event.candidate && targetPartnerId) {
+          console.log("🧊 Generated ICE candidate:", {
+            type: event.candidate.type,
+            protocol: event.candidate.protocol,
+            address: event.candidate.address || "hidden",
+            port: event.candidate.port,
+            foundation: event.candidate.foundation,
+          });
           sendMessage({
             type: "ice-candidate",
             candidate: event.candidate,
             to: targetPartnerId,
             from: userId,
           });
+        } else if (!event.candidate) {
+          console.log("✅ ICE gathering completed");
         }
       };
 
@@ -365,6 +399,14 @@ export function useSpeedDating() {
       try {
         const message: ServerMessage = JSON.parse(event.data);
         console.log("📨 Received message:", message.type, message);
+        console.log("🔍 Current state when message received:", {
+          connectionState,
+          partnerId,
+          isInitiator,
+          hasPeerConnection: !!peerConnectionRef.current,
+          hasLocalStream: !!localStreamRef.current,
+          wsReadyState: wsRef.current?.readyState,
+        });
 
         switch (message.type) {
           case "joined-queue":
@@ -470,7 +512,13 @@ export function useSpeedDating() {
             break;
         }
       } catch (err) {
-        console.error("Failed to parse message:", err);
+        console.error("❌ Failed to parse WebSocket message:", err);
+        console.log("📄 Raw message data:", event.data);
+        setError(
+          `Message parsing error: ${
+            err instanceof Error ? err.message : "Unknown"
+          }`
+        );
       }
     };
 
@@ -498,6 +546,32 @@ export function useSpeedDating() {
     };
 
     wsRef.current = ws;
+
+    // Health check - log connection state every 2 seconds
+    const healthCheck = setInterval(() => {
+      if (wsRef.current) {
+        console.log("💓 WebSocket health check:", {
+          readyState: wsRef.current.readyState,
+          url: wsRef.current.url,
+          connectionState,
+          partnerId,
+          hasLocalStream: !!localStreamRef.current,
+          hasPeerConnection: !!peerConnectionRef.current,
+        });
+      }
+    }, 2000);
+
+    // Clean up health check when WebSocket closes
+    const originalOnClose = ws.onclose;
+    ws.onclose = (event) => {
+      clearInterval(healthCheck);
+      console.log("🔌 WebSocket disconnected", {
+        code: event.code,
+        reason: event.reason,
+        wasClean: event.wasClean,
+      });
+      setConnectionState("disconnected");
+    };
   }, [
     userId,
     startLocalVideo,

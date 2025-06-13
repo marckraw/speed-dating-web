@@ -64,6 +64,9 @@ export function useSpeedDating() {
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
 
+  // Queue for ICE candidates received before remote description is set
+  const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
+
   // WebRTC configuration
   const pcConfig = {
     iceServers: [
@@ -138,30 +141,62 @@ export function useSpeedDating() {
     }
   }, []);
 
+  const createOfferWithPartner = useCallback(
+    async (targetPartnerId: string) => {
+      console.log(
+        "🔊 createOfferWithPartner called with partner:",
+        targetPartnerId
+      );
+      if (!peerConnectionRef.current || !localStreamRef.current) {
+        console.log("❌ createOfferWithPartner: Missing requirements", {
+          hasPeerConnection: !!peerConnectionRef.current,
+          hasLocalStream: !!localStreamRef.current,
+        });
+        return;
+      }
+
+      try {
+        console.log("📤 Adding local tracks to peer connection...");
+        // Add local stream to peer connection
+        localStreamRef.current.getTracks().forEach((track) => {
+          peerConnectionRef.current!.addTrack(track, localStreamRef.current!);
+          console.log("➕ Added track:", track.kind);
+        });
+
+        console.log("🎯 Creating offer...");
+        const offer = await peerConnectionRef.current.createOffer();
+        console.log("✅ Offer created, setting local description...");
+        await peerConnectionRef.current.setLocalDescription(offer);
+        console.log("📨 Sending offer to partner:", targetPartnerId);
+
+        sendMessage({
+          type: "offer",
+          offer,
+          to: targetPartnerId,
+          from: userId,
+        });
+        console.log("✅ Offer sent successfully");
+      } catch (err) {
+        console.error("❌ Failed to create offer:", err);
+        setError("Failed to create call offer");
+      }
+    },
+    [sendMessage, userId]
+  );
+
   const createOffer = useCallback(async () => {
-    if (!peerConnectionRef.current || !localStreamRef.current || !partnerId)
+    console.log("🔊 createOffer called");
+    if (!peerConnectionRef.current || !localStreamRef.current || !partnerId) {
+      console.log("❌ createOffer: Missing requirements", {
+        hasPeerConnection: !!peerConnectionRef.current,
+        hasLocalStream: !!localStreamRef.current,
+        partnerId,
+      });
       return;
-
-    try {
-      // Add local stream to peer connection
-      localStreamRef.current.getTracks().forEach((track) => {
-        peerConnectionRef.current!.addTrack(track, localStreamRef.current!);
-      });
-
-      const offer = await peerConnectionRef.current.createOffer();
-      await peerConnectionRef.current.setLocalDescription(offer);
-
-      sendMessage({
-        type: "offer",
-        offer,
-        to: partnerId,
-        from: userId,
-      });
-    } catch (err) {
-      console.error("Failed to create offer:", err);
-      setError("Failed to create call offer");
     }
-  }, [partnerId, sendMessage, userId]);
+
+    await createOfferWithPartner(partnerId);
+  }, [partnerId, createOfferWithPartner]);
 
   const createAnswer = useCallback(
     async (offer: RTCSessionDescriptionInit) => {
@@ -169,14 +204,41 @@ export function useSpeedDating() {
         return;
 
       try {
+        console.log("📞 Creating answer...");
+
         // Add local stream to peer connection
+        console.log("📤 Adding local tracks to peer connection...");
         localStreamRef.current.getTracks().forEach((track) => {
           peerConnectionRef.current!.addTrack(track, localStreamRef.current!);
+          console.log("➕ Added track:", track.kind);
         });
 
+        console.log("🔧 Setting remote description (offer)...");
         await peerConnectionRef.current.setRemoteDescription(offer);
+        console.log("✅ Remote description set successfully");
+
+        // Process any queued ICE candidates now that remote description is set
+        if (iceCandidateQueueRef.current.length > 0) {
+          console.log(
+            `🧊 Processing ${iceCandidateQueueRef.current.length} queued ICE candidates...`
+          );
+          for (const candidate of iceCandidateQueueRef.current) {
+            try {
+              await peerConnectionRef.current.addIceCandidate(candidate);
+              console.log("✅ Queued ICE candidate added successfully");
+            } catch (err) {
+              console.error("❌ Failed to add queued ICE candidate:", err);
+            }
+          }
+          // Clear the queue
+          iceCandidateQueueRef.current = [];
+        }
+
+        console.log("🎯 Creating answer...");
         const answer = await peerConnectionRef.current.createAnswer();
+        console.log("✅ Answer created, setting local description...");
         await peerConnectionRef.current.setLocalDescription(answer);
+        console.log("📨 Sending answer to partner:", partnerId);
 
         sendMessage({
           type: "answer",
@@ -184,8 +246,9 @@ export function useSpeedDating() {
           to: partnerId,
           from: userId,
         });
+        console.log("✅ Answer sent successfully");
       } catch (err) {
-        console.error("Failed to create answer:", err);
+        console.error("❌ Failed to create answer:", err);
         setError("Failed to answer call");
       }
     },
@@ -206,14 +269,47 @@ export function useSpeedDating() {
     []
   );
 
-  const handleIceCandidate = useCallback(
-    async (candidate: RTCIceCandidateInit) => {
-      if (!peerConnectionRef.current) return;
+  const processQueuedIceCandidates = useCallback(async () => {
+    if (!peerConnectionRef.current || iceCandidateQueueRef.current.length === 0)
+      return;
 
+    console.log(
+      `🧊 Processing ${iceCandidateQueueRef.current.length} queued ICE candidates...`
+    );
+
+    for (const candidate of iceCandidateQueueRef.current) {
       try {
         await peerConnectionRef.current.addIceCandidate(candidate);
+        console.log("✅ Queued ICE candidate added successfully");
       } catch (err) {
-        console.error("Failed to add ICE candidate:", err);
+        console.error("❌ Failed to add queued ICE candidate:", err);
+      }
+    }
+
+    // Clear the queue
+    iceCandidateQueueRef.current = [];
+  }, []);
+
+  const handleIceCandidate = useCallback(
+    async (candidate: RTCIceCandidateInit) => {
+      if (!peerConnectionRef.current) {
+        console.log("❌ No peer connection for ICE candidate");
+        return;
+      }
+
+      // Check if remote description is set
+      if (!peerConnectionRef.current.remoteDescription) {
+        console.log("⏳ Remote description not set yet, queuing ICE candidate");
+        iceCandidateQueueRef.current.push(candidate);
+        return;
+      }
+
+      try {
+        console.log("🧊 Adding ICE candidate immediately");
+        await peerConnectionRef.current.addIceCandidate(candidate);
+        console.log("✅ ICE candidate added successfully");
+      } catch (err) {
+        console.error("❌ Failed to add ICE candidate:", err);
       }
     },
     []
@@ -235,14 +331,14 @@ export function useSpeedDating() {
     );
 
     ws.onopen = () => {
-      console.log("WebSocket connected");
+      console.log("✅ WebSocket connected successfully");
       setConnectionState("connected");
     };
 
     ws.onmessage = async (event) => {
       try {
         const message: ServerMessage = JSON.parse(event.data);
-        console.log("Received message:", message.type);
+        console.log("📨 Received message:", message.type, message);
 
         switch (message.type) {
           case "joined-queue":
@@ -254,26 +350,80 @@ export function useSpeedDating() {
             break;
 
           case "match-found":
+            console.log(
+              "🎯 Match found! Partner:",
+              message.partnerId,
+              "Is initiator:",
+              message.isInitiator
+            );
             setPartnerId(message.partnerId);
             setIsInitiator(message.isInitiator);
             setConnectionState("matched");
 
-            // Start local video and create peer connection
-            await startLocalVideo();
-            peerConnectionRef.current = createPeerConnection(message.partnerId);
+            try {
+              // Start local video and create peer connection
+              console.log("📹 Starting local video...");
+              await startLocalVideo();
+              console.log("✅ Local video started successfully");
 
-            // If initiator, create and send offer
-            if (message.isInitiator) {
-              setTimeout(() => createOffer(), 1000); // Small delay to ensure setup
+              console.log("🔗 Creating peer connection...");
+              peerConnectionRef.current = createPeerConnection(
+                message.partnerId
+              );
+              console.log("✅ Peer connection created successfully");
+
+              // If initiator, create and send offer
+              if (message.isInitiator) {
+                console.log(
+                  "🚀 I'm the initiator, will create offer in 1 second..."
+                );
+                // Capture partnerId in closure to avoid state reset issues
+                const currentPartnerId = message.partnerId;
+                setTimeout(() => {
+                  console.log(
+                    "⏰ Timeout fired, creating offer for partner:",
+                    currentPartnerId
+                  );
+                  if (
+                    peerConnectionRef.current &&
+                    localStreamRef.current &&
+                    currentPartnerId
+                  ) {
+                    // Create offer directly with captured partnerId
+                    createOfferWithPartner(currentPartnerId);
+                  } else {
+                    console.error(
+                      "❌ Missing requirements for offer after timeout:",
+                      {
+                        hasPeerConnection: !!peerConnectionRef.current,
+                        hasLocalStream: !!localStreamRef.current,
+                        partnerId: currentPartnerId,
+                      }
+                    );
+                  }
+                }, 1000);
+              } else {
+                console.log("⏳ I'm the receiver, waiting for offer...");
+              }
+            } catch (error) {
+              console.error("❌ Error in match-found handling:", error);
+              setError(
+                `Failed to setup connection: ${
+                  error instanceof Error ? error.message : "Unknown error"
+                }`
+              );
             }
             break;
 
           case "offer":
+            console.log("📥 Received offer from:", message.from);
             if (!peerConnectionRef.current) {
+              console.log("🔧 No peer connection yet, creating one...");
               // Create peer connection if we don't have one yet
               await startLocalVideo();
               peerConnectionRef.current = createPeerConnection(partnerId!);
             }
+            console.log("📞 Creating answer...");
             await createAnswer(message.offer);
             break;
 
@@ -298,20 +448,24 @@ export function useSpeedDating() {
       }
     };
 
-    ws.onclose = () => {
-      console.log("WebSocket disconnected");
+    ws.onclose = (event) => {
+      console.log("🔌 WebSocket disconnected", {
+        code: event.code,
+        reason: event.reason,
+        wasClean: event.wasClean,
+      });
       setConnectionState("disconnected");
     };
 
     ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
+      console.error("❌ WebSocket error:", error);
       setError("Connection error - please check your internet connection");
       setConnectionState("disconnected");
 
       // Try to reconnect after a delay
       setTimeout(() => {
         if (wsRef.current?.readyState !== WebSocket.OPEN) {
-          console.log("Attempting to reconnect...");
+          console.log("🔄 Attempting to reconnect...");
           connect();
         }
       }, 3000);

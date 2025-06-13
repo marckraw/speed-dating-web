@@ -45,5 +45,3 @@ coverage.xml
 # evals
 packages/api/results.json
 packages/api/plans
-
-*.js

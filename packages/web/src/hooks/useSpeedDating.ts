@@ -398,26 +398,6 @@ export function useSpeedDating() {
     [sendMessage, userId]
   );
 
-  const handleAnswer = useCallback(
-    async (answer: RTCSessionDescriptionInit) => {
-      if (!peerConnectionRef.current) {
-        console.error("❌ Cannot handle answer, no peer connection");
-        return;
-      }
-      try {
-        console.log("✅ Received answer, setting remote description...");
-        await peerConnectionRef.current.setRemoteDescription(answer);
-        console.log(
-          "🎉 Remote description (answer) set successfully! Connection should establish now."
-        );
-      } catch (err) {
-        console.error("❌ Failed to set remote description from answer:", err);
-        setError("Failed to process call answer");
-      }
-    },
-    []
-  );
-
   const processQueuedIceCandidates = useCallback(async () => {
     if (!peerConnectionRef.current || iceCandidateQueueRef.current.length === 0)
       return;
@@ -438,6 +418,28 @@ export function useSpeedDating() {
     // Clear the queue
     iceCandidateQueueRef.current = [];
   }, []);
+
+  const handleAnswer = useCallback(
+    async (answer: RTCSessionDescriptionInit) => {
+      if (!peerConnectionRef.current) {
+        console.error("❌ Cannot handle answer, no peer connection");
+        return;
+      }
+      try {
+        console.log("✅ Received answer, setting remote description...");
+        await peerConnectionRef.current.setRemoteDescription(answer);
+        console.log(
+          "🎉 Remote description (answer) set successfully! Connection should establish now."
+        );
+        // Process any candidates that were queued while waiting for the answer.
+        await processQueuedIceCandidates();
+      } catch (err) {
+        console.error("❌ Failed to set remote description from answer:", err);
+        setError("Failed to process call answer");
+      }
+    },
+    [processQueuedIceCandidates]
+  );
 
   const handleIceCandidate = useCallback(
     async (candidate: RTCIceCandidateInit) => {

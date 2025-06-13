@@ -159,14 +159,14 @@ export default function VideoCallInterface() {
               <div className="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-sm">
                 {partnerId || "Partner"}
               </div>
-              {connectionState === "matched" && (
+              {/* {connectionState === "matched" && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/70">
                   <div className="text-white text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
                     <p>Connecting...</p>
                   </div>
                 </div>
-              )}
+              )} */}
             </div>
           </div>
         )}
@@ -176,34 +176,47 @@ export default function VideoCallInterface() {
       <div className="flex flex-col items-center justify-center gap-4">
         {connectionState === "connected" && (
           <div className="w-full max-w-sm space-y-4">
-            {videoDevices.length > 1 && (
-              <div>
-                <label
-                  htmlFor="camera-select"
-                  className="block text-sm font-medium text-muted-foreground mb-1"
-                >
-                  Select Camera
-                </label>
-                <select
-                  id="camera-select"
-                  value={selectedVideoDeviceId || ""}
-                  onChange={(e) => setSelectedVideoDeviceId(e.target.value)}
-                  className="block w-full p-2 border-border rounded-md bg-background text-foreground"
-                >
-                  {videoDevices.map((device, index) => (
-                    <option key={device.deviceId} value={device.deviceId}>
-                      {device.label || `Camera ${index + 1}`}
-                    </option>
-                  ))}
-                </select>
+            {/* Camera Selection - Always show when connected */}
+            {videoDevices.length > 0 && (
+              <div className="bg-card p-4 rounded-lg border">
+                <h3 className="text-lg font-semibold mb-3">Camera Settings</h3>
+                <div>
+                  <label
+                    htmlFor="camera-select"
+                    className="block text-sm font-medium text-muted-foreground mb-2"
+                  >
+                    Select Camera
+                  </label>
+                  <select
+                    id="camera-select"
+                    value={selectedVideoDeviceId || ""}
+                    onChange={(e) => setSelectedVideoDeviceId(e.target.value)}
+                    className="block w-full p-2 border-border rounded-md bg-background text-foreground"
+                  >
+                    {videoDevices.map((device, index) => (
+                      <option key={device.deviceId} value={device.deviceId}>
+                        {device.label || `Camera ${index + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
-            <button
-              onClick={handleJoinQueue}
-              className="w-full bg-gradient-to-r from-pink-500 to-red-500 text-white px-8 py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity"
-            >
-              Start Dating 💕
-            </button>
+
+            {/* Join Queue Button - Separate section */}
+            <div className="bg-card p-4 rounded-lg border">
+              <h3 className="text-lg font-semibold mb-3">Ready to start?</h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                Make sure your camera is working and you're happy with your
+                setup, then join the queue to meet someone new!
+              </p>
+              <button
+                onClick={handleJoinQueue}
+                className="w-full bg-gradient-to-r from-pink-500 to-red-500 text-white px-8 py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity"
+              >
+                Join queue 💕
+              </button>
+            </div>
           </div>
         )}
 

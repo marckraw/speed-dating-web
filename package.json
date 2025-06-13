@@ -23,8 +23,7 @@
     "test:run": "turbo run test:run --filter=grid.ef.design --filter=horizon.ef.design",
     "test:coverage": "turbo run test:coverage --filter=grid.ef.design --filter=horizon.ef.design",
     "test:ui": "turbo run test:ui --filter=grid.ef.design --filter=horizon.ef.design",
-    "release": "turbo build && changeset publish",
-    "changelog:trigger": "npx tsx scripts/trigger-changelog-automation.ts"
+    "release": "turbo build && changeset publish"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.10",

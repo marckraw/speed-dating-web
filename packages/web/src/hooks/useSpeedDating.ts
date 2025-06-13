@@ -152,6 +152,7 @@ export function useSpeedDating() {
       };
 
       pc.ontrack = (event) => {
+        console.log("[pc.ontrack] event", event);
         console.log("Received remote stream");
         remoteStreamRef.current = event.streams[0];
         if (remoteVideoRef.current) {
@@ -342,9 +343,8 @@ export function useSpeedDating() {
   }, [partnerId, createOfferWithPartner]);
 
   const createAnswer = useCallback(
-    async (offer: RTCSessionDescriptionInit) => {
-      if (!peerConnectionRef.current || !localStreamRef.current || !partnerId)
-        return;
+    async (offer: RTCSessionDescriptionInit, senderId: string) => {
+      if (!peerConnectionRef.current || !localStreamRef.current) return;
 
       try {
         console.log("📞 Creating answer...");
@@ -381,12 +381,12 @@ export function useSpeedDating() {
         const answer = await peerConnectionRef.current.createAnswer();
         console.log("✅ Answer created, setting local description...");
         await peerConnectionRef.current.setLocalDescription(answer);
-        console.log("📨 Sending answer to partner:", partnerId);
+        console.log("📨 Sending answer to partner:", senderId);
 
         sendMessage({
           type: "answer",
           answer,
-          to: partnerId,
+          to: senderId,
           from: userId,
         });
         console.log("✅ Answer sent successfully");
@@ -395,7 +395,7 @@ export function useSpeedDating() {
         setError("Failed to answer call");
       }
     },
-    [partnerId, sendMessage, userId]
+    [sendMessage, userId]
   );
 
   const handleAnswer = useCallback(
@@ -482,12 +482,18 @@ export function useSpeedDating() {
     ws.onopen = () => {
       console.log("✅ WebSocket connected successfully");
       setConnectionState("connected");
+      setError(null); // Clear any previous error when successfully connected
     };
 
     ws.onmessage = async (event) => {
       try {
         const message: ServerMessage = JSON.parse(event.data);
-        console.log("📨 Received message:", message.type, message);
+        console.log("[ws.onmessage] event message", message);
+        console.log(
+          "📨 [ws.onmessage] Received message:",
+          message.type,
+          message
+        );
         console.log("🔍 Current state when message received:", {
           ...stateRef.current,
           hasPeerConnection: !!peerConnectionRef.current,
@@ -522,9 +528,12 @@ export function useSpeedDating() {
               console.log("✅ Local video started successfully");
 
               console.log("🔗 Creating peer connection...");
+              // const dupa = createPeerConnection(message.partnerId);
+
               peerConnectionRef.current = createPeerConnection(
                 message.partnerId
               );
+              console.log("[ws.onmessage] dupa", peerConnectionRef.current);
               console.log("✅ Peer connection created successfully");
 
               // If initiator, create and send offer
@@ -579,7 +588,7 @@ export function useSpeedDating() {
               peerConnectionRef.current = createPeerConnection(message.from);
             }
             console.log("📞 Creating answer...");
-            await createAnswer(message.offer);
+            await createAnswer(message.offer, message.from);
             break;
 
           case "answer":
@@ -648,7 +657,7 @@ export function useSpeedDating() {
           hasPeerConnection: !!peerConnectionRef.current,
         });
       }
-    }, 2000);
+    }, 20000);
 
     // Clean up health check when WebSocket closes
     const originalOnClose = ws.onclose;

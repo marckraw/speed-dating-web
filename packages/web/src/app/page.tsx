@@ -1,3 +1,4 @@
+import { SignInButton } from "@/components/SignInButton";
 import Link from "next/link";
 
 export default function Home() {
@@ -18,6 +19,7 @@ export default function Home() {
           >
             Start Dating 💕
           </Link>
+          <SignInButton />
         </div>
       </div>
     </main>

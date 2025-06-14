@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/providers/theme-provider";
 import { cn } from "@/lib/utils";
 import { NavigationLayout } from "@/components/layouts/navigation-layout";
 import { QueryProvider } from "@/providers/query-provider";
+import { AuthProvider } from "@/providers/AuthProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -27,9 +28,11 @@ export default function RootLayout({
         )}
       >
         <ThemeProvider>
-          <QueryProvider>
-            <NavigationLayout>{children}</NavigationLayout>
-          </QueryProvider>
+          <AuthProvider>
+            <QueryProvider>
+              <NavigationLayout>{children}</NavigationLayout>
+            </QueryProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

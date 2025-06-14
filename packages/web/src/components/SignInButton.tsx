@@ -30,9 +30,15 @@ export const SignInButton = () => {
   }
 
   if (user) {
+    console.log("Firebase User:", user);
+
     return (
       <div className="flex items-center gap-4">
-        <span>Welcome, {user.displayName}</span>
+        <div className="text-sm text-right">
+          <div>Welcome, {user.displayName}</div>
+          <div className="text-xs text-muted-foreground">{user.email}</div>
+          <div className="text-xs text-muted-foreground">UID: {user.uid}</div>
+        </div>
         <Button onClick={handleSignOut}>Sign Out</Button>
       </div>
     );
